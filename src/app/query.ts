@@ -3,6 +3,7 @@ import {
   EMPTY,
   Observable,
   catchError,
+  debounceTime,
   distinctUntilChanged,
   first,
   merge,
@@ -13,17 +14,11 @@ import {
 
 export type Nil = null | undefined;
 
-export type DeepReadonly<T> = {
-  readonly [P in keyof T]: T[P] extends Record<string, unknown>
-    ? DeepReadonly<T[P]>
-    : T[P];
+export type ObservableState<T> = Observable<T> & {
+  getValue: () => T;
 };
 
-export type ObservableState<T> = Observable<DeepReadonly<T>> & {
-  getValue: () => DeepReadonly<T>;
-};
-
-function toObservableState<T>(
+export function toObservableState<T>(
   obs$: Observable<T>,
   getValue: () => T,
 ): ObservableState<T> {
@@ -32,47 +27,57 @@ function toObservableState<T>(
 }
 
 export type QueryResult<T> = {
-  data$: ObservableState<DeepReadonly<T | Nil>>;
+  data$: ObservableState<T | Nil>;
   isLoading$: ObservableState<boolean>;
   isError$: ObservableState<boolean>;
   getError: () => Error | Nil;
   refetch: () => void;
 };
 
-export function defineQuery<T>(config: {
-  queryFn: () => Observable<T>;
-}): QueryResult<T> {
-  const state$ = new BehaviorSubject<DeepReadonly<T | Nil>>(void 0);
+export function defineQuery<
+  TData,
+  TArgs extends [...ObservableState<any>[]],
+>(config: {
+  queryArgs: TArgs;
+  queryFn: (...args: MapArgs<TArgs>) => Observable<TData>;
+}): QueryResult<TData> {
+  const state$ = new BehaviorSubject<TData | Nil>(void 0);
   const isLoading$ = new BehaviorSubject(true);
   const isError$ = new BehaviorSubject(false);
   let error: Error | Nil = void 0;
 
   const refetch$ = new BehaviorSubject<void>(void 0);
 
+  function setLoading(): void {
+    isLoading$.next(true);
+    isError$.next(false);
+    state$.next(void 0);
+    error = void 0;
+  }
+
+  function handleSuccess(data: TData): void {
+    isLoading$.next(false);
+    isError$.next(false);
+    error = void 0;
+    state$.next(data);
+  }
+
+  function handleError(e: any): Observable<never> {
+    isLoading$.next(false);
+    isError$.next(true);
+    error = e;
+    return EMPTY;
+  }
+
   const data$ = merge(
     state$,
-    refetch$.pipe(
+    merge(refetch$, ...config.queryArgs).pipe(
+      debounceTime(0),
       switchMap(() => {
-        isLoading$.next(true);
-        isError$.next(false);
-        state$.next(void 0);
-        error = void 0;
-
-        return config.queryFn().pipe(
-          first(),
-          tap((data) => {
-            isLoading$.next(false);
-            isError$.next(false);
-            error = void 0;
-            state$.next(data);
-          }),
-          catchError((e) => {
-            isLoading$.next(false);
-            isError$.next(true);
-            error = e;
-            return EMPTY;
-          }),
-        );
+        setLoading();
+        return config
+          .queryFn(...(config.queryArgs.map((arg) => arg.getValue()) as any))
+          .pipe(first(), tap(handleSuccess), catchError(handleError));
       }),
       switchMap(() => EMPTY),
     ),
@@ -88,5 +93,12 @@ export function defineQuery<T>(config: {
     ),
     getError: () => error,
     refetch: () => refetch$.next(),
-  } satisfies QueryResult<T>;
+  } satisfies QueryResult<TData>;
 }
+
+type MapArgs<Tuple extends [...ObservableState<any>[]]> = {
+  [Index in keyof Tuple]: Observed<Tuple[Index]>;
+};
+
+type Observed<T extends ObservableState<any>> =
+  T extends ObservableState<infer K> ? K : T;

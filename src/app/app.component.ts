@@ -1,14 +1,21 @@
 import { CommonModule } from '@angular/common';
 import { Component } from '@angular/core';
 import { defineQuery } from './query';
-import { of, switchMap, throwError, timer } from 'rxjs';
+import { BehaviorSubject, of, switchMap, throwError, timer } from 'rxjs';
 
 @Component({
   selector: 'app-root',
   standalone: true,
   imports: [CommonModule],
   template: `
-    <button (click)="query.refetch()">REFETCH</button>
+    <p>
+      <button (click)="a.next(a.getValue() + 1)">a: {{ a | async }}</button>
+    </p>
+    <p>
+      <button (click)="b.next(b.getValue() + 1)">b: {{ b | async }}</button>
+    </p>
+    <p><button (click)="query.refetch()">Refetch</button></p>
+    <p><button (click)="reset()">Reset</button></p>
     @if (query.isLoading$ | async) {
       Loading...
     }
@@ -21,14 +28,21 @@ import { of, switchMap, throwError, timer } from 'rxjs';
   `,
 })
 export class AppComponent {
+  readonly a = new BehaviorSubject(1);
+  readonly b = new BehaviorSubject(1);
+
   readonly query = defineQuery({
-    queryFn: () =>
+    queryArgs: [this.a, this.b],
+    queryFn: (a, b) =>
       timer(1000).pipe(
         switchMap(() => {
-          return Math.random() > 0.5
-            ? of(Math.random())
-            : throwError(() => 'Error!');
+          return Math.random() > 0.5 ? of(a + b) : throwError(() => 'Error!');
         }),
       ),
   });
+
+  reset(): void {
+    this.a.next(1);
+    this.b.next(1);
+  }
 }
