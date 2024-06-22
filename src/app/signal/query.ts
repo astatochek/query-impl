@@ -5,6 +5,7 @@ import {
   inject,
   signal,
   effect,
+  computed,
 } from '@angular/core';
 import { Observable, first } from 'rxjs';
 
@@ -18,15 +19,14 @@ export type QueryResult<T> = {
   refetch: () => void;
 };
 
-export function defineQuery<T, const Args extends Signal<any>[] = []>(config: {
-  queryArgs?: Args;
-  queryFn: (...args: MapArgs<Args>) => Observable<T>;
-  injector?: Injector;
-}): QueryResult<T> {
-  if (!config.injector) {
+export function defineQuery<T>(
+  queryFn: () => Observable<T>,
+  injector?: Injector,
+): QueryResult<T> {
+  if (!injector) {
     assertInInjectionContext(defineQuery);
   }
-  const injector = config.injector ?? inject(Injector);
+  const _injector = injector ?? inject(Injector);
 
   const data = signal<T | Nil>(void 0);
   const isLoading = signal(true);
@@ -59,24 +59,17 @@ export function defineQuery<T, const Args extends Signal<any>[] = []>(config: {
 
   effect(
     (onCleanup) => {
-      const _trigger = refetchTrigger();
-
-      const args = (config.queryArgs ?? []).map((dep) =>
-        dep(),
-      ) as MapArgs<Args>;
+      refetchTrigger();
       setLoading();
 
-      const subscription = config
-        .queryFn(...args)
-        .pipe(first())
-        .subscribe({
-          next: handleSuccess,
-          error: handleError,
-        });
+      const subscription = queryFn().pipe(first()).subscribe({
+        next: handleSuccess,
+        error: handleError,
+      });
 
       onCleanup(() => subscription.unsubscribe());
     },
-    { injector, allowSignalWrites: true },
+    { injector: _injector, allowSignalWrites: true },
   );
 
   return {
@@ -87,7 +80,3 @@ export function defineQuery<T, const Args extends Signal<any>[] = []>(config: {
     refetch: () => refetchTrigger.set(refetchTrigger() + 1),
   } satisfies QueryResult<T>;
 }
-
-type MapArgs<Args extends Signal<any>[]> = {
-  [K in keyof Args]: Args[K] extends Signal<infer T> ? T : never;
-};

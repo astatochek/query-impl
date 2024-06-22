@@ -1,7 +1,12 @@
 import { CommonModule } from '@angular/common';
-import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  effect,
+  signal,
+} from '@angular/core';
 import { defineQuery } from './query';
-import { of, switchMap, throwError, timer } from 'rxjs';
+import { Observable, of, switchMap, throwError, timer } from 'rxjs';
 
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -33,15 +38,15 @@ export class SignalExampleComponent {
   readonly a = signal(1);
   readonly b = signal(1);
 
-  readonly query = defineQuery({
-    queryArgs: [this.a, this.b],
-    queryFn: (a, b) =>
-      timer(1000).pipe(
-        switchMap(() =>
-          Math.random() > 0.5 ? of(a + b) : throwError(() => 'Error!'),
-        ),
+  readonly query = defineQuery(() => this.getData(this.a(), this.b()));
+
+  getData(a: number, b: number): Observable<number> {
+    return timer(1000).pipe(
+      switchMap(() =>
+        Math.random() > 0.5 ? of(a + b) : throwError(() => 'Error!'),
       ),
-  });
+    );
+  }
 
   reset(): void {
     this.a.set(1);
