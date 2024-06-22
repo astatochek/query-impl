@@ -34,7 +34,7 @@ export function defineQuery<T, const Args extends Signal<any>[] = []>(config: {
 
   let error: Error | Nil = void 0;
 
-  const refetch = signal(0);
+  const refetchTrigger = signal(0);
 
   function handleSuccess(value: T): void {
     isError.set(false);
@@ -59,7 +59,8 @@ export function defineQuery<T, const Args extends Signal<any>[] = []>(config: {
 
   effect(
     (onCleanup) => {
-      const trigger = refetch();
+      const _trigger = refetchTrigger();
+
       const args = (config.queryArgs ?? []).map((dep) =>
         dep(),
       ) as MapArgs<Args>;
@@ -83,7 +84,7 @@ export function defineQuery<T, const Args extends Signal<any>[] = []>(config: {
     isLoading: isLoading.asReadonly(),
     isError: isError.asReadonly(),
     getError: () => error,
-    refetch: () => refetch.set(refetch() + 1),
+    refetch: () => refetchTrigger.set(refetchTrigger() + 1),
   } satisfies QueryResult<T>;
 }
 
