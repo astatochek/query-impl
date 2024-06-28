@@ -19,12 +19,12 @@ export type QueryResult<T> = {
   refetch: () => void;
 };
 
-export function query<T>(
-  queryFn: () => Observable<T>,
+export function async<T>(
+  queryFn: () => Observable<T> | undefined,
   injector?: Injector,
 ): QueryResult<T> {
   if (!injector) {
-    assertInInjectionContext(query);
+    assertInInjectionContext(async);
   }
   const _injector = injector ?? inject(Injector);
 
@@ -64,7 +64,10 @@ export function query<T>(
         refetchTrigger();
         setLoading();
 
-        const subscription = queryFn()
+        const query = queryFn();
+        if (!query) return;
+
+        const subscription = query
           .pipe(takeUntilDestroyed(dr), first())
           .subscribe({
             next: handleSuccess,

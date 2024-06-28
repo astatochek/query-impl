@@ -1,6 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
-import { query } from './query';
+import { async } from './async-query';
 import { Observable, of, switchMap, throwError, timer } from 'rxjs';
 
 @Component({
@@ -33,7 +33,7 @@ export class SignalExampleComponent {
   readonly a = signal(1);
   readonly b = signal(1);
 
-  readonly query = query(() => this.getData(this.a(), this.b()));
+  readonly query = async(() => this.getData(this.a(), this.b()));
 
   getData(a: number, b: number): Observable<number> {
     return timer(1000).pipe(
