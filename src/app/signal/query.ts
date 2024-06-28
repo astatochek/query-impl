@@ -5,34 +5,34 @@ import {
   inject,
   signal,
   effect,
-  computed,
+  runInInjectionContext,
+  DestroyRef,
 } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Observable, first } from 'rxjs';
 
-export type Nil = null | undefined;
-
 export type QueryResult<T> = {
-  data: Signal<T | Nil>;
+  data: Signal<T | undefined>;
   isLoading: Signal<boolean>;
   isError: Signal<boolean>;
-  getError: () => Error | Nil;
+  getError: () => Error | undefined;
   refetch: () => void;
 };
 
-export function defineQuery<T>(
+export function query<T>(
   queryFn: () => Observable<T>,
   injector?: Injector,
 ): QueryResult<T> {
   if (!injector) {
-    assertInInjectionContext(defineQuery);
+    assertInInjectionContext(query);
   }
   const _injector = injector ?? inject(Injector);
 
-  const data = signal<T | Nil>(void 0);
+  const data = signal<T | undefined>(void 0);
   const isLoading = signal(true);
   const isError = signal(false);
 
-  let error: Error | Nil = void 0;
+  let error: Error | undefined = void 0;
 
   const refetchTrigger = signal(0);
 
@@ -57,20 +57,25 @@ export function defineQuery<T>(
     data.set(void 0);
   }
 
-  effect(
-    (onCleanup) => {
-      refetchTrigger();
-      setLoading();
+  runInInjectionContext(_injector, () => {
+    const dr = inject(DestroyRef);
+    effect(
+      (onCleanup) => {
+        refetchTrigger();
+        setLoading();
 
-      const subscription = queryFn().pipe(first()).subscribe({
-        next: handleSuccess,
-        error: handleError,
-      });
+        const subscription = queryFn()
+          .pipe(takeUntilDestroyed(dr), first())
+          .subscribe({
+            next: handleSuccess,
+            error: handleError,
+          });
 
-      onCleanup(() => subscription.unsubscribe());
-    },
-    { injector: _injector, allowSignalWrites: true },
-  );
+        onCleanup(() => subscription.unsubscribe());
+      },
+      { allowSignalWrites: true },
+    );
+  });
 
   return {
     data: data.asReadonly(),

@@ -1,11 +1,6 @@
 import { CommonModule } from '@angular/common';
-import {
-  ChangeDetectionStrategy,
-  Component,
-  effect,
-  signal,
-} from '@angular/core';
-import { defineQuery } from './query';
+import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
+import { query } from './query';
 import { Observable, of, switchMap, throwError, timer } from 'rxjs';
 
 @Component({
@@ -38,7 +33,7 @@ export class SignalExampleComponent {
   readonly a = signal(1);
   readonly b = signal(1);
 
-  readonly query = defineQuery(() => this.getData(this.a(), this.b()));
+  readonly query = query(() => this.getData(this.a(), this.b()));
 
   getData(a: number, b: number): Observable<number> {
     return timer(1000).pipe(

@@ -7,6 +7,6 @@ import { SignalExampleComponent } from './signal/example.component';
   selector: 'app-root',
   standalone: true,
   imports: [CommonModule, RxjsExampleComponent, SignalExampleComponent],
-  template: ` <rxjs-example /> <signal-example />`,
+  template: ` <signal-example />`,
 })
 export class AppComponent {}
