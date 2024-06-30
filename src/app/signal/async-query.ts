@@ -62,10 +62,11 @@ export function async<T>(
     effect(
       (onCleanup) => {
         refetchTrigger();
-        setLoading();
 
         const query = queryFn();
         if (!query) return;
+
+        setLoading();
 
         const subscription = query
           .pipe(takeUntilDestroyed(dr), first())
