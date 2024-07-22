@@ -15,7 +15,7 @@ import { FormsModule } from '@angular/forms';
       Loading...
     }
     @if (getText.isError()) {
-      {{ getText.getError() | json }}
+      {{ getText.error() | json }}
     }
     @if (getText.data()) {
       {{ getText.data() | json }}

@@ -22,7 +22,7 @@ import { Observable, of, switchMap, throwError, timer } from 'rxjs';
       Loading...
     }
     @if (query.isError()) {
-      Error: {{ query.getError() | json }}
+      Error: {{ query.error() | json }}
     }
     @if (query.data(); as data) {
       Data: {{ data | json }}

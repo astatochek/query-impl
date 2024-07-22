@@ -11,53 +11,62 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Observable, first } from 'rxjs';
 
-export type QueryResult<T> = {
+export type QueryResult<T, E> = {
   data: Signal<T | undefined>;
   isLoading: Signal<boolean>;
   isError: Signal<boolean>;
-  getError: () => Error | undefined;
+  error: Signal<E | undefined>;
   refetch: () => void;
 };
 
-export function async<T>(
+export type QueryOptions<E = any> = Partial<{
+  injector: Injector;
+  parseError: (err: any) => E;
+}>;
+
+export function async<T, E = any>(
   queryFn: () => Observable<T> | undefined,
-  injector?: Injector,
-): QueryResult<T> {
-  if (!injector) {
+  options: QueryOptions<E> = {},
+): QueryResult<T, E> {
+  if (!options.injector) {
     assertInInjectionContext(async);
   }
-  const _injector = injector ?? inject(Injector);
+  const injector = options.injector ?? inject(Injector);
+  const parseError = options.parseError ?? ((e: any) => e);
 
   const data = signal<T | undefined>(void 0);
   const isLoading = signal(true);
   const isError = signal(false);
-
-  let error: Error | undefined = void 0;
+  const error = signal<E | undefined>(void 0);
 
   const refetchTrigger = signal(0);
+
+  function refetch(): void {
+    refetchTrigger.set(refetchTrigger() + 1);
+  }
 
   function handleSuccess(value: T): void {
     isError.set(false);
     isLoading.set(false);
-    error = void 0;
+    error.set(void 0);
     data.set(value);
   }
 
   function handleError(e: any): void {
     isError.set(true);
     isLoading.set(false);
-    error = e;
+    error.set(parseError(e));
     data.set(void 0);
   }
 
   function setLoading(): void {
     isError.set(false);
     isLoading.set(true);
-    error = void 0;
+    error.set(void 0);
     data.set(void 0);
   }
 
-  runInInjectionContext(_injector, () => {
+  runInInjectionContext(injector, () => {
     const dr = inject(DestroyRef);
     effect(
       (onCleanup) => {
@@ -85,7 +94,7 @@ export function async<T>(
     data: data.asReadonly(),
     isLoading: isLoading.asReadonly(),
     isError: isError.asReadonly(),
-    getError: () => error,
-    refetch: () => refetchTrigger.set(refetchTrigger() + 1),
-  } satisfies QueryResult<T>;
+    error: error.asReadonly(),
+    refetch,
+  } satisfies QueryResult<T, E>;
 }

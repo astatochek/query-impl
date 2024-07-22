@@ -22,7 +22,7 @@ type User = {
       Loading...
     }
     @if (getUser.isError()) {
-      {{ getUser.getError() | json }}
+      {{ getUser.error() | json }}
     }
     @if (getUser.data(); as data) {
       {{ data | json }}
@@ -40,11 +40,14 @@ export class UserComponent {
     this.userId.set(id);
   }
 
-  getUser = async(() => {
-    const userId = this.userId();
-    if (!userId) return;
-    return this.http.getUserById(userId);
-  });
+  getUser = async(
+    () => {
+      const userId = this.userId();
+      if (!userId) return;
+      return this.http.getUserById(userId);
+    },
+    { parseError: () => 'Something went wrong...' },
+  );
 }
 
 class FakeHttp {
